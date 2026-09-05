@@ -1,0 +1,166 @@
+# Despliegue continuo de Zarku.
+#
+# Cada push a main valida, compila y publica el sitio en el hosting cPanel por SSH.
+# El servidor solo recibe el dist/ ya compilado: allá no hay Node ni npm.
+#
+# El hosting es una cuenta compartida (usuario `rivetecc`) que aloja otros doce
+# dominios de clientes. Por eso el despliegue apunta SIEMPRE a un subdirectorio
+# explícito y nunca al home: un rsync con --delete sobre el home borraría el resto.
+
+name: Desplegar
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desplegar-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERSION_NODE: '22'
+  DOMINIO: zarku.ec
+  # Vite sustituye las VITE_* al compilar, no las lee al ejecutarse. Ninguna es
+  # secreta —todas acaban dentro del bundle, que cualquiera puede leer—, así que
+  # las direcciones van escritas aquí. Solo el token pasa por Secrets, para no
+  # dejarlo en el repositorio.
+  VITE_CMS_BASE_URL: https://erp.mashaec.net/api/cms/zarku-ecuador
+  VITE_ECOMMERCE_BASE_URL: https://erp.mashaec.net/api/ecommerce/zarku-ecuador
+  VITE_ERP_STORAGE_URL: https://erp.mashaec.net/storage
+
+jobs:
+  validar:
+    name: Validar y compilar
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Traer el código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Preparar Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ env.VERSION_NODE }}
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Revisar el código
+        run: npm run lint
+
+      - name: Compilar
+        env:
+          VITE_CMS_TOKEN: ${{ secrets.ZARKU_CMS_TOKEN }}
+        run: npm run build
+
+      - name: Comprobar que el build sirve
+        run: |
+          test -f dist/index.html || { echo "::error::El build no generó index.html"; exit 1; }
+
+          # Sin .htaccess, Apache no reescribe las rutas: /catalogo/algo y
+          # /producto/algo darían 404 al recargar, y el Open Graph por noticia
+          # dejaría de funcionar porque nadie enrutaría hacia og.php.
+          test -f dist/.htaccess || { echo "::error::Falta dist/.htaccess: las rutas internas darán 404"; exit 1; }
+          test -f dist/og.php   || { echo "::error::Falta dist/og.php: las noticias perderían su Open Graph"; exit 1; }
+
+          # Que compile no basta: sin las VITE_* el build pasa igual y el sitio
+          # se publica sin datos. Se comprueba que la dirección quedó dentro.
+          grep -rq "erp.mashaec.net" dist/assets/*.js \
+            || { echo "::error::El bundle no lleva la URL del ERP: ¿faltan las VITE_*?"; exit 1; }
+
+          echo "Peso del sitio: $(du -sh dist | cut -f1)"
+
+      - name: Guardar el resultado
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sitio
+          path: dist/
+          include-hidden-files: true   # sin esto el .htaccess no viaja
+          retention-days: 5
+
+  desplegar:
+    name: Publicar en el hosting
+    needs: validar
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    if: >-
+      github.event_name != 'pull_request' &&
+      github.ref == 'refs/heads/main' &&
+      github.repository == 'Alej1405/zarku-web'
+
+    environment:
+      name: produccion
+      url: https://zarku.ec
+
+    steps:
+      - name: Recuperar el sitio compilado
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sitio
+          path: dist
+
+      - name: Comprobar que los secretos del servidor llegaron
+        env:
+          SECRETOS: |
+            ZARKU_HOST=${{ secrets.ZARKU_HOST }}
+            ZARKU_USUARIO=${{ secrets.ZARKU_USUARIO }}
+            ZARKU_KNOWN_HOSTS=${{ secrets.ZARKU_KNOWN_HOSTS }}
+            ZARKU_SSH_KEY=${{ secrets.ZARKU_SSH_KEY }}
+        run: |
+          faltan=0
+          while IFS='=' read -r nombre valor; do
+            [ -z "$nombre" ] && continue
+            if [ -z "$valor" ]; then echo "::error::Falta el secreto $nombre"; faltan=1; fi
+          done <<< "$SECRETOS"
+          [ "$faltan" -eq 0 ] \
+            || { echo "::error::Sin estos secretos el rsync falla con 'Permission denied', que parece un problema del servidor y no lo es."; exit 1; }
+          echo "Los 4 secretos del servidor tienen valor."
+
+      # El secreto guarda la clave en base64, en una sola línea. Una clave OpenSSH
+      # ocupa varias y basta con que el copiar y pegar junte dos para que deje de
+      # ser válida: ssh falla con "error in libcrypto", que no dice nada de eso.
+      # Se genera con:  base64 < ~/.ssh/despliegue_linkcargo | tr -d '\n' | pbcopy
+      - name: Preparar el acceso SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s' "${{ secrets.ZARKU_SSH_KEY }}" | base64 -d > ~/.ssh/despliegue
+          chmod 600 ~/.ssh/despliegue
+          printf '%s\n' "${{ secrets.ZARKU_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+          ssh-keygen -y -f ~/.ssh/despliegue > /dev/null \
+            || { echo "::error::ZARKU_SSH_KEY no es una clave válida. Regenérala en base64."; exit 1; }
+
+      # --delete deja el servidor idéntico al build, pero .well-known guarda el
+      # reto de Let's Encrypt: si se borra, la renovación del SSL falla.
+      - name: Subir el sitio
+        env:
+          DESTINO: ${{ secrets.ZARKU_USUARIO }}@${{ secrets.ZARKU_HOST }}
+        run: |
+          rsync -rlptz --delete --checksum --chmod=D755,F644 \
+            --exclude='.well-known' \
+            -e "ssh -i ~/.ssh/despliegue -p ${{ secrets.ZARKU_PUERTO || 22 }} -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+            dist/ "$DESTINO:${{ env.DOMINIO }}/"
+
+      - name: Borrar la clave del runner
+        if: always()
+        run: rm -f ~/.ssh/despliegue
+
+      - name: Comprobar que el sitio responde
+        run: |
+          for intento in 1 2 3; do
+            codigo=$(curl -sS -o /dev/null -w '%{http_code}' "https://${{ env.DOMINIO }}" || echo 000)
+            [ "$codigo" = "200" ] && { echo "El sitio responde 200"; exit 0; }
+            echo "Intento $intento: HTTP $codigo. Reintento en 10 s."
+            sleep 10
+          done
+          echo "::error::El sitio no respondió 200 después del despliegue"
+          exit 1
