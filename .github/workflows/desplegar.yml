@@ -94,7 +94,7 @@ jobs:
     if: >-
       github.event_name != 'pull_request' &&
       github.ref == 'refs/heads/main' &&
-      github.repository == 'Alej1405/zarku-web'
+      github.repository == 'Alej1405/Zarku.ec'
 
     environment:
       name: produccion
