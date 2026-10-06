@@ -9,7 +9,7 @@ import { FeaturedCarousel } from '@/components/catalog/FeaturedCarousel';
 import { RichText } from '@/components/catalog/RichText';
 import { ProductGridSkeleton } from '@/components/catalog/ProductGrid';
 import { formatPrice, productImages } from '@/lib/media';
-import { whatsappLink } from '@/lib/format';
+import { numeroWhatsapp, whatsappLink } from '@/lib/format';
 import { findProduct, relatedProducts } from '@/lib/catalog';
 import type { Product as Prod } from '@/schemas/ecommerce';
 
@@ -74,7 +74,7 @@ export default function Product() {
 
   const related = product ? relatedProducts(productList, product) : [];
   const price = product ? formatPrice(product.precio_venta) : '';
-  const waPhone = contact?.whatsapp ?? contact?.telefono;
+  const waPhone = numeroWhatsapp(contact?.whatsapp, contact?.telefono);
   const waLink = product
     ? whatsappLink(waPhone, `Hola Zarku, quiero pedir: ${product.nombre} (${price}) 🏔️`)
     : '#';

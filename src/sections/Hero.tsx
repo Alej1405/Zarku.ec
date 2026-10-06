@@ -8,6 +8,7 @@ import {
 } from 'framer-motion';
 import { ArrowDown, ArrowUpRight } from 'lucide-react';
 import { useAppSelector } from '@/hooks/redux';
+import { useLogo } from '@/hooks/useLogo';
 import { MagneticButton } from '@/components/motion/MagneticButton';
 import { Marquee } from '@/components/motion/Marquee';
 import { HeroTerrain } from '@/components/three/HeroTerrain';
@@ -37,6 +38,7 @@ const word: Variants = {
 
 export function Hero() {
   const reduce = useReducedMotion();
+  const logo = useLogo();
   const ref = useRef<HTMLElement>(null);
   const hero = useAppSelector((s) => s.hero.data);
 
@@ -76,7 +78,7 @@ export function Hero() {
       >
         <div className="absolute inset-0 -z-10 rounded-full bg-volt/20 blur-[120px]" />
         <img
-          src="/brand/isotipo.png"
+          src={logo}
           alt=""
           className="h-[min(78vh,720px)] w-auto opacity-90 [mask-image:radial-gradient(circle_at_center,black_60%,transparent_100%)]"
         />

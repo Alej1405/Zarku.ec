@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Home } from '@/pages/Home';
+import { useAppDispatch } from '@/hooks/redux';
+import { fetchEmpresa } from '@/store/slices/empresaSlice';
 
 // Las páginas del catálogo cargan bajo demanda: no lastran el bundle inicial
 // de la Home (que ya arrastra Three.js).
@@ -29,9 +31,13 @@ function IndexRoute() {
 }
 
 export function App() {
+  const dispatch = useAppDispatch();
+
   useEffect(() => {
     appBooted = true;
-  }, []);
+    // El logo lo usan el navbar y el footer de todas las rutas.
+    void dispatch(fetchEmpresa());
+  }, [dispatch]);
 
   return (
     <Suspense fallback={null}>

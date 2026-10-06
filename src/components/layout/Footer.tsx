@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAppSelector } from '@/hooks/redux';
 import { MagneticButton } from '@/components/motion/MagneticButton';
 import { Reveal } from '@/components/motion/Reveal';
-import { formatPhone, whatsappLink } from '@/lib/format';
+import { formatPhone, numeroWhatsapp, whatsappLink } from '@/lib/format';
+import { useLogo } from '@/hooks/useLogo';
 
 function TikTok({ size = 18 }: { size?: number }) {
   return (
@@ -14,6 +15,7 @@ function TikTok({ size = 18 }: { size?: number }) {
 }
 
 export function Footer() {
+  const logo = useLogo();
   const contact = useAppSelector((s) => s.contact.data);
   const redes = contact?.redes ?? {};
   const phone = contact?.telefono;
@@ -64,7 +66,7 @@ export function Footer() {
         <Reveal delay={0.1}>
           <div className="mt-10 flex flex-wrap items-center gap-4">
             <MagneticButton
-              href={whatsappLink(phone, 'Hola Zarku, quiero hacer un pedido 🏔️')}
+              href={whatsappLink(numeroWhatsapp(contact?.whatsapp, phone), 'Hola Zarku, quiero hacer un pedido 🏔️')}
               variant="volt"
             >
               Escribir por WhatsApp
@@ -118,7 +120,7 @@ export function Footer() {
       <div className="relative z-10 border-t border-line">
         <div className="container-x flex flex-col items-center justify-between gap-4 py-7 sm:flex-row">
           <div className="flex items-center gap-3">
-            <img src="/brand/isotipo.png" alt="" className="h-8 w-8 rounded-md" />
+            <img src={logo} alt="" className="h-8 w-8 rounded-md" />
             <span className="font-display text-sm font-bold uppercase tracking-wide">
               Zarku <span className="text-muted">· Mountain Store</span>
             </span>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
@@ -30,29 +30,29 @@ export function Home() {
   useLenis();
   useScrollSpy(SECTION_IDS);
 
-  const [minElapsed, setMinElapsed] = useState(false);
-  const settled = useAppSelector((s) =>
-    [s.hero.status, s.about.status, s.services.status, s.faq.status, s.contact.status].every(
-      (st) => st === 'succeeded' || st === 'failed',
-    ),
+  const heroStatus = useAppSelector((s) => s.hero.status);
+  const aboutStatus = useAppSelector((s) => s.about.status);
+  const servicesStatus = useAppSelector((s) => s.services.status);
+  const faqStatus = useAppSelector((s) => s.faq.status);
+  const contactStatus = useAppSelector((s) => s.contact.status);
+  const productsStatus = useAppSelector((s) => s.products.status);
+
+  // El loader solo cubre la primera carga: al volver a la Home desde otra
+  // página los datos ya están en el store y la página aparece de inmediato.
+  const loading = [heroStatus, aboutStatus, servicesStatus, faqStatus, contactStatus].some(
+    (st) => st === 'idle' || st === 'loading',
   );
-  const loading = !settled || !minElapsed;
 
+  // Pide solo lo que aún no se cargó (mismo patrón que CatalogShell).
   useEffect(() => {
-    void dispatch(fetchHero());
-    void dispatch(fetchAbout());
-    void dispatch(fetchServices());
-    void dispatch(fetchFaq());
-    void dispatch(fetchContact());
-    // Productos para la vitrina; no bloquea el loader (no entra en `settled`).
-    void dispatch(fetchProducts());
-  }, [dispatch]);
-
-  // Tiempo mínimo de exhibición para evitar el parpadeo del loader.
-  useEffect(() => {
-    const t = setTimeout(() => setMinElapsed(true), 750);
-    return () => clearTimeout(t);
-  }, []);
+    if (heroStatus === 'idle') void dispatch(fetchHero());
+    if (aboutStatus === 'idle') void dispatch(fetchAbout());
+    if (servicesStatus === 'idle') void dispatch(fetchServices());
+    if (faqStatus === 'idle') void dispatch(fetchFaq());
+    if (contactStatus === 'idle') void dispatch(fetchContact());
+    // Productos para la vitrina; no bloquea el loader.
+    if (productsStatus === 'idle') void dispatch(fetchProducts());
+  }, [dispatch, heroStatus, aboutStatus, servicesStatus, faqStatus, contactStatus, productsStatus]);
 
   // Bloquea el scroll mientras carga.
   useEffect(() => {

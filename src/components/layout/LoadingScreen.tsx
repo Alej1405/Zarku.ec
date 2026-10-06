@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from 'framer-motion';
+import { useLogo } from '@/hooks/useLogo';
 
 /**
  * Pantalla de carga de marca: isotipo con anillo de pulso volt mientras
@@ -6,6 +7,7 @@ import { motion, useReducedMotion } from 'framer-motion';
  */
 export function LoadingScreen() {
   const reduce = useReducedMotion();
+  const logo = useLogo();
 
   return (
     <motion.div
@@ -35,7 +37,7 @@ export function LoadingScreen() {
         )}
 
         <motion.img
-          src="/brand/isotipo.png"
+          src={logo}
           alt="Cargando Zarku"
           className="relative h-20 w-20 rounded-2xl"
           animate={reduce ? undefined : { scale: [1, 1.06, 1] }}

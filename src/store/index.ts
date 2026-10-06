@@ -8,6 +8,7 @@ import uiReducer from '@/store/slices/uiSlice';
 import productsReducer from '@/store/slices/productsSlice';
 import categoriesReducer from '@/store/slices/categoriesSlice';
 import postsReducer from '@/store/slices/postsSlice';
+import empresaReducer from '@/store/slices/empresaSlice';
 
 export const store = configureStore({
   reducer: {
@@ -20,6 +21,7 @@ export const store = configureStore({
     products: productsReducer,
     categories: categoriesReducer,
     posts: postsReducer,
+    empresa: empresaReducer,
   },
 });
 

@@ -19,6 +19,15 @@ export function toIntlNumber(raw?: string | null): string {
   return digits;
 }
 
+/**
+ * Número para WhatsApp: el campo `whatsapp` del ERP si de verdad es un número;
+ * si no (vacío, o texto como "Ecuador"), el teléfono de contacto.
+ */
+export function numeroWhatsapp(whatsapp?: string | null, telefono?: string | null): string | null {
+  const digitos = (whatsapp ?? '').replace(/\D/g, '');
+  return digitos.length >= 7 ? (whatsapp as string) : (telefono ?? null);
+}
+
 export function whatsappLink(raw?: string | null, message?: string): string {
   const num = toIntlNumber(raw);
   const q = message ? `?text=${encodeURIComponent(message)}` : '';

@@ -91,3 +91,11 @@ export const contactSchema = z.object({
 });
 export type Contact = z.infer<typeof contactSchema>;
 export type Redes = z.infer<typeof redesSchema>;
+
+/** Datos de la empresa: llegan dentro de `all`; solo se conserva este bloque. */
+export const empresaSchema = z.object({
+  nombre: nullableStr,
+  logo: nullableStr,
+});
+export type Empresa = z.infer<typeof empresaSchema>;
+export const allEmpresaSchema = z.object({ empresa: empresaSchema }).transform((d) => d.empresa);

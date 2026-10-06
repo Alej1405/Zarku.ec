@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Mountain, ShoppingBag, Layers, MessageCircle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { setScrolled } from '@/store/slices/uiSlice';
+import { useLogo } from '@/hooks/useLogo';
 
 /** Enlace de sección de la Home (ancla) o ruta propia. */
 type NavItem =
@@ -32,6 +33,7 @@ const MOBILE_TABS: MobileTab[] = [
 
 export function Navbar() {
   const dispatch = useAppDispatch();
+  const logo = useLogo();
   const { pathname } = useLocation();
   const scrolled = useAppSelector((s) => s.ui.scrolled);
   const active = useAppSelector((s) => s.ui.activeSection);
@@ -47,8 +49,6 @@ export function Navbar() {
     return () => window.removeEventListener('scroll', onScroll);
   }, [dispatch]);
 
-  /** Href de una sección: ancla si estamos en Home, ruta con hash si no. */
-  const sectionHref = (id: string) => (onHome ? `#${id}` : `/#${id}`);
   const isRouteActive = (match: string) => pathname.startsWith(match);
 
   return (
@@ -64,7 +64,7 @@ export function Navbar() {
         <nav className="container-x flex h-[68px] items-center justify-between md:h-[92px]">
           <Link to="/" className="group flex items-center gap-2.5" aria-label="Zarku — inicio">
             <img
-              src="/brand/isotipo.png"
+              src={logo}
               alt=""
               className="h-9 w-9 rounded-md transition-transform duration-500 group-hover:rotate-[-8deg]"
             />
@@ -92,10 +92,10 @@ export function Navbar() {
               return (
                 <li key={l.label}>
                   {l.kind === 'section' ? (
-                    <a href={sectionHref(l.id)} aria-current={isActive ? 'true' : undefined} className={cls}>
+                    <EnlaceSeccion id={l.id} enHome={onHome} activo={isActive} className={cls}>
                       {l.label}
                       {underline}
-                    </a>
+                    </EnlaceSeccion>
                   ) : (
                     <Link to={l.to} aria-current={isActive ? 'page' : undefined} className={cls}>
                       {l.label}
@@ -140,9 +140,9 @@ export function Navbar() {
             return (
               <li key={t.label} className="flex-1">
                 {t.kind === 'section' ? (
-                  <a href={sectionHref(t.id)} aria-current={isActive ? 'true' : undefined} className={cls}>
+                  <EnlaceSeccion id={t.id} enHome={onHome} activo={isActive} className={cls}>
                     {inner}
-                  </a>
+                  </EnlaceSeccion>
                 ) : (
                   <Link to={t.to} aria-current={isActive ? 'page' : undefined} className={cls}>
                     {inner}
@@ -154,5 +154,34 @@ export function Navbar() {
         </ul>
       </nav>
     </>
+  );
+}
+
+interface EnlaceSeccionProps {
+  id: string;
+  enHome: boolean;
+  activo: boolean;
+  className: string;
+  children: ReactNode;
+}
+
+/**
+ * Enlace a una sección de la Home. En la Home es un ancla (scroll suave con
+ * Lenis); fuera de ella navega con el router a `/#id`, sin recargar la app:
+ * la Home ya tiene los datos en el store y salta a la sección al montar.
+ */
+function EnlaceSeccion({ id, enHome, activo, className, children }: EnlaceSeccionProps) {
+  if (enHome) {
+    return (
+      <a href={`#${id}`} aria-current={activo ? 'true' : undefined} className={className}>
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <Link to={{ pathname: '/', hash: `#${id}` }} className={className}>
+      {children}
+    </Link>
   );
 }
